@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Insights Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#F5F6F8;
+    --panel:#FFFFFF;
+    --ink:#12203A;
+    --muted:#5B6B82;
+    --faint:#8C99AC;
+    --line:#E3E6EB;
+    --accent:#2F5EA8;
+    --accent-2:#D68A2B;
+    --good:#0F8A6E;
+    --radius:14px;
+
+    /* occupation palette — consistent across every chart */
+    --c-professional:#2F5EA8;
+    --c-educator:#0F8A6E;
+    --c-accountant:#D68A2B;
+    --c-research:#7B4FA0;
+    --c-skilled:#B14A3A;
+    --c-swe:#4C7A3D;
+    --c-ai:#C24B84;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1360px;margin:0 auto;padding:28px 32px 60px;}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    flex-wrap:wrap;gap:16px;
+    margin-bottom:22px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);font-weight:600;margin:0 0 6px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:32px;font-weight:700;margin:0;letter-spacing:-.01em;
+  }
+  header p.sub{margin:6px 0 0;color:var(--muted);font-size:14.5px;max-width:520px;}
+  .refresh-note{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--faint);
+    text-align:right;
+  }
+
+  /* ---------- filter bar ---------- */
+  .filterbar{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 20px;margin-bottom:22px;
+    display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;
+    box-shadow:0 1px 2px rgba(18,32,58,.04);
+  }
+  .field{display:flex;flex-direction:column;gap:6px;min-width:150px;}
+  .field label{
+    font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);
+  }
+  select, .range-wrap{
+    font-family:'Inter',sans-serif;font-size:13.5px;color:var(--ink);
+    border:1px solid var(--line);border-radius:8px;padding:8px 10px;
+    background:#fff;
+  }
+  select{cursor:pointer;min-width:150px;}
+  select:focus, button:focus, input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .range-wrap{display:flex;flex-direction:column;gap:4px;min-width:180px;}
+  .range-vals{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;}
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  #resetBtn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:13px;
+    background:var(--ink);color:#fff;border:none;border-radius:8px;
+    padding:9px 16px;cursor:pointer;transition:opacity .15s;
+    margin-left:auto;align-self:center;
+  }
+  #resetBtn:hover{opacity:.85;}
+
+  /* ---------- kpi row ---------- */
+  .kpis{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px;
+  }
+  .kpi{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px;position:relative;overflow:hidden;
+    box-shadow:0 1px 2px rgba(18,32,58,.04);
+  }
+  .kpi .label{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;}
+  .kpi .value{
+    font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
+    margin-top:6px;letter-spacing:-.01em;
+  }
+  .kpi .bar{position:absolute;left:0;bottom:0;height:4px;width:100%;background:var(--accent);}
+  .kpi:nth-child(2) .bar{background:var(--good);}
+  .kpi:nth-child(3) .bar{background:var(--accent-2);}
+  .kpi:nth-child(4) .bar{background:var(--c-research);}
+
+  /* ---------- chart grid ---------- */
+  .grid{
+    display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;margin-bottom:16px;
+  }
+  .grid2{
+    display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;
+  }
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px 12px;box-shadow:0 1px 2px rgba(18,32,58,.04);
+    display:flex;flex-direction:column;
+  }
+  .card h3{
+    font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;margin:0 0 2px;
+  }
+  .card p.desc{margin:0 0 10px;font-size:12px;color:var(--muted);}
+  .card .canvas-wrap{position:relative;flex:1;min-height:220px;}
+  .legend-row{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px;}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+  .swatch{width:9px;height:9px;border-radius:2px;display:inline-block;}
+
+  /* ---------- table ---------- */
+  .table-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 20px 8px;box-shadow:0 1px 2px rgba(18,32,58,.04);
+  }
+  .table-card h3{font-family:'Space Grotesk',sans-serif;font-size:16px;margin:0 0 2px;}
+  .table-card p.desc{margin:0 0 14px;font-size:12.5px;color:var(--muted);}
+  .table-scroll{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:2px solid var(--line);
+    cursor:pointer;user-select:none;white-space:nowrap;
+  }
+  thead th:hover{color:var(--accent);}
+  thead th .arrow{font-size:9px;margin-left:3px;color:var(--faint);}
+  tbody td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  tbody tr:hover{background:#F9FAFC;}
+  .tag{
+    display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;padding:2px 8px;border-radius:20px;font-weight:500;
+  }
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .name-cell{font-weight:600;}
+  .mono{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);}
+  .yn-y{color:var(--good);font-weight:600;}
+  .yn-n{color:var(--faint);}
+  .empty-state{
+    text-align:center;padding:40px 20px;color:var(--muted);font-size:13.5px;
+  }
+  .count-pill{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);
+    margin-left:8px;
+  }
+
+  footer{margin-top:24px;text-align:center;color:var(--faint);font-size:11.5px;font-family:'IBM Plex Mono',monospace;}
+
+  @media (max-width:1000px){
+    .grid{grid-template-columns:1fr;}
+    .grid2{grid-template-columns:1fr;}
+    .kpis{grid-template-columns:1fr 1fr;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="eyebrow">Customer Analytics · Book1.xlsx</p>
+      <h1>Customer Insights Dashboard</h1>
+      <p class="sub">Demographic, income and occupation profile of the customer base. Filter below — every chart and the table react together.</p>
+    </div>
+    <div class="refresh-note">31 RECORDS · GENERATED 14 JUL 2026</div>
+  </header>
+
+  <div class="filterbar" role="group" aria-label="Filters">
+    <div class="field">
+      <label for="f-occupation">Occupation</label>
+      <select id="f-occupation"><option value="">All occupations</option></select>
+    </div>
+    <div class="field">
+      <label for="f-education">Education</label>
+      <select id="f-education"><option value="">All education</option></select>
+    </div>
+    <div class="field">
+      <label for="f-gender">Gender</label>
+      <select id="f-gender"><option value="">All</option></select>
+    </div>
+    <div class="field">
+      <label for="f-marital">Marital status</label>
+      <select id="f-marital"><option value="">All</option></select>
+    </div>
+    <div class="field">
+      <label for="f-home">Home owner</label>
+      <select id="f-home"><option value="">All</option></select>
+    </div>
+    <div class="field">
+      <label for="r-age">Age range</label>
+      <div class="range-wrap">
+        <div class="range-vals"><span id="ageMinLbl"></span><span id="ageMaxLbl"></span></div>
+        <input type="range" id="r-age-min">
+        <input type="range" id="r-age-max">
+      </div>
+    </div>
+    <div class="field">
+      <label for="r-income">Income range</label>
+      <div class="range-wrap">
+        <div class="range-vals"><span id="incMinLbl"></span><span id="incMaxLbl"></span></div>
+        <input type="range" id="r-inc-min">
+        <input type="range" id="r-inc-max">
+      </div>
+    </div>
+    <button id="resetBtn">Reset filters</button>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="label">Customers shown</div><div class="value" id="kpiCount">—</div><div class="bar"></div></div>
+    <div class="kpi"><div class="label">Avg. annual income</div><div class="value" id="kpiIncome">—</div><div class="bar"></div></div>
+    <div class="kpi"><div class="label">Homeownership rate</div><div class="value" id="kpiHome">—</div><div class="bar"></div></div>
+    <div class="kpi"><div class="label">Avg. age</div><div class="value" id="kpiAge">—</div><div class="bar"></div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Income vs. age</h3>
+      <p class="desc">Each point is a customer, colored by occupation. Bubble size reflects household size.</p>
+      <div class="canvas-wrap"><canvas id="scatterChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Occupation mix</h3>
+      <p class="desc">Share of customers by occupation.</p>
+      <div class="canvas-wrap"><canvas id="occChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Home ownership</h3>
+      <p class="desc">Owners vs. renters in the current filter.</p>
+      <div class="canvas-wrap"><canvas id="homeChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Income distribution</h3>
+      <p class="desc">Customer count by annual income band.</p>
+      <div class="canvas-wrap"><canvas id="incomeHist"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Age distribution</h3>
+      <p class="desc">Customer count by age band.</p>
+      <div class="canvas-wrap"><canvas id="ageHist"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Education background</h3>
+      <p class="desc">Highest qualification held, most common first.</p>
+      <div class="canvas-wrap"><canvas id="eduChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Household size</h3>
+      <p class="desc">Number of children per customer.</p>
+      <div class="canvas-wrap"><canvas id="childChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <h3>Customer records <span class="count-pill" id="tableCount"></span></h3>
+    <p class="desc">Click a column header to sort. Reflects the filters above.</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="id">ID<span class="arrow"></span></th>
+            <th data-key="name">Name<span class="arrow"></span></th>
+            <th data-key="age">Age<span class="arrow"></span></th>
+            <th data-key="gender">Gender<span class="arrow"></span></th>
+            <th data-key="maritalStatus">Marital<span class="arrow"></span></th>
+            <th data-key="occupation">Occupation<span class="arrow"></span></th>
+            <th data-key="education">Education<span class="arrow"></span></th>
+            <th data-key="income">Income<span class="arrow"></span></th>
+            <th data-key="children">Children<span class="arrow"></span></th>
+            <th data-key="homeOwner">Home<span class="arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">No customers match the current filters.</div>
+    </div>
+  </div>
+
+  <footer>CUSTOMER INSIGHTS DASHBOARD — BUILT FROM BOOK1.XLSX</footer>
+</div>
+
+<script>
+const DATA = [{"id": 11000, "firstName": "JOHN", "lastName": "YANG", "age": 59, "maritalStatus": "M", "gender": "M", "income": 590000, "children": 2, "education": "Bachelor in Arts", "occupation": "Professional", "homeOwner": "Y"}, {"id": 11001, "firstName": "EUGEN", "lastName": "HUANG", "age": 61, "maritalStatus": "S", "gender": "M", "income": 650000, "children": 1, "education": "Bachelor in Physics", "occupation": "Educator", "homeOwner": "Y"}, {"id": 11002, "firstName": "RUBEN", "lastName": "TORRIS", "age": 60, "maritalStatus": "S", "gender": "M", "income": 430000, "children": 3, "education": "Bachelor in Commerse", "occupation": "Accountant", "homeOwner": "Y"}, {"id": 11003, "firstName": "CHRISTY", "lastName": "ZHU", "age": 61, "maritalStatus": "S", "gender": "F", "income": 840000, "children": 2, "education": "Bachelor in Arts", "occupation": "Educator", "homeOwner": "N"}, {"id": 11004, "firstName": "ELIZABETH", "lastName": "JOHNSON", "age": 60, "maritalStatus": "S", "gender": "F", "income": 1250000, "children": 1, "education": "Bachelor in Arts", "occupation": "Educator", "homeOwner": "N"}, {"id": 11005, "firstName": "JULID", "lastName": "RUDZ", "age": 61, "maritalStatus": "M", "gender": "M", "income": 745000, "children": 4, "education": "Bachelor in Chemistry", "occupation": "Research", "homeOwner": "Y"}, {"id": 11006, "firstName": "MARCO", "lastName": "MEHTA", "age": 62, "maritalStatus": "M", "gender": "M", "income": 865000, "children": 2, "education": "Bachelor in Physics", "occupation": "Educator", "homeOwner": "Y"}, {"id": 11007, "firstName": "ROBIN", "lastName": "VERHOOF", "age": 62, "maritalStatus": "S", "gender": "F", "income": 940000, "children": 1, "education": "Bachelor in Physics", "occupation": "Research", "homeOwner": "N"}, {"id": 11008, "firstName": "SHANNON", "lastName": "CARLSON", "age": 62, "maritalStatus": "M", "gender": "M", "income": 549000, "children": 3, "education": "Bachelor in Commerse", "occupation": "Accountant", "homeOwner": "Y"}, {"id": 11009, "firstName": "JACQUELY", "lastName": "SAUREZ", "age": 63, "maritalStatus": "S", "gender": "F", "income": 725000, "children": 5, "education": "Bachelor in History", "occupation": "Educator", "homeOwner": "Y"}, {"id": 11010, "firstName": "CURTIS", "lastName": "LU", "age": 58, "maritalStatus": "M", "gender": "M", "income": 649000, "children": 0, "education": "Bachelor in Urdu", "occupation": "Educator", "homeOwner": "N"}, {"id": 11011, "firstName": "LAUREN", "lastName": "WALKER", "age": 58, "maritalStatus": "M", "gender": "M", "income": 1125000, "children": 0, "education": "ITI", "occupation": "Skilled Worker", "homeOwner": "N"}, {"id": 11012, "firstName": "IAN", "lastName": "JENKINS", "age": 57, "maritalStatus": "M", "gender": "F", "income": 1285000, "children": 1, "education": "ITI", "occupation": "Skilled Worker", "homeOwner": "Y"}, {"id": 11013, "firstName": "SYDNEY", "lastName": "BENNETT", "age": 47, "maritalStatus": "S", "gender": "M", "income": 1450000, "children": 3, "education": "Masters in Maths", "occupation": "Research", "homeOwner": "N"}, {"id": 11014, "firstName": "CHLOE", "lastName": "YOUNG", "age": 52, "maritalStatus": "M", "gender": "F", "income": 758000, "children": 2, "education": "B.Tech", "occupation": "Educator", "homeOwner": "Y"}, {"id": 11015, "firstName": "EMILY", "lastName": "DAVIS", "age": 81, "maritalStatus": "S", "gender": "F", "income": 686000, "children": 0, "education": "M.Tech", "occupation": "Research", "homeOwner": "N"}, {"id": 11016, "firstName": "LUNA", "lastName": "SANDERS", "age": 48, "maritalStatus": "S", "gender": "F", "income": 954000, "children": 2, "education": "Bachelor in Arts", "occupation": "Educator", "homeOwner": "N"}, {"id": 11017, "firstName": "PENELOPE", "lastName": "JORDAN", "age": 47, "maritalStatus": "M", "gender": "M", "income": 845200, "children": 3, "education": "Bacheloer in Physics", "occupation": "Educator", "homeOwner": "Y"}, {"id": 11018, "firstName": "AUSTIN", "lastName": "VO", "age": 48, "maritalStatus": "S", "gender": "M", "income": 982200, "children": 1, "education": "ITI", "occupation": "Skilled Worker", "homeOwner": "N"}, {"id": 11019, "firstName": "JOSHUA", "lastName": "GUPTA", "age": 47, "maritalStatus": "S", "gender": "M", "income": 1507500, "children": 1, "education": "B.Tech", "occupation": "Software Engineer", "homeOwner": "Y"}, {"id": 11020, "firstName": "RUBY", "lastName": "BARNES", "age": 47, "maritalStatus": "M", "gender": "F", "income": 987400, "children": 0, "education": "B.Tech", "occupation": "Software Engineer", "homeOwner": "N"}, {"id": 11021, "firstName": "WYATT", "lastName": "HILL", "age": 47, "maritalStatus": "M", "gender": "F", "income": 852600, "children": 1, "education": "Masters in Maths", "occupation": "Educator", "homeOwner": "N"}, {"id": 11022, "firstName": "CHARENCE", "lastName": "WANG", "age": 80, "maritalStatus": "S", "gender": "M", "income": 872100, "children": 2, "education": "M.Tech", "occupation": "Research", "homeOwner": "N"}, {"id": 11023, "firstName": "LUKE", "lastName": "LAL", "age": 80, "maritalStatus": "M", "gender": "M", "income": 984520, "children": 3, "education": "M.Tech", "occupation": "Educator", "homeOwner": "Y"}, {"id": 11024, "firstName": "JORDAN", "lastName": "KING", "age": 80, "maritalStatus": "S", "gender": "M", "income": 897000, "children": 1, "education": "M.Tech", "occupation": "Research", "homeOwner": "N"}, {"id": 11025, "firstName": "DESTINY", "lastName": "WILSON", "age": 71, "maritalStatus": "S", "gender": "F", "income": 987500, "children": 1, "education": "B.Tech", "occupation": "AI Architect", "homeOwner": "Y"}, {"id": 11026, "firstName": "ETHAN", "lastName": "ZHANG", "age": 74, "maritalStatus": "S", "gender": "M", "income": 782160, "children": 4, "education": "M.Tech", "occupation": "AI Architect", "homeOwner": "N"}, {"id": 11027, "firstName": "SETH", "lastName": "EDWARDS", "age": 64, "maritalStatus": "M", "gender": "M", "income": 982000, "children": 0, "education": "ITI", "occupation": "Skilled Worker", "homeOwner": "N"}, {"id": 11028, "firstName": "RUSSELL", "lastName": "XE", "age": 53, "maritalStatus": "M", "gender": "M", "income": 782000, "children": 3, "education": "ITI", "occupation": "Skilled Worker", "homeOwner": "Y"}, {"id": 11029, "firstName": "ALEXENDER", "lastName": "BECK", "age": 45, "maritalStatus": "M", "gender": "Unknown", "income": 982000, "children": 1, "education": "Bachelor in Commerse", "occupation": "Accountant", "homeOwner": "N"}, {"id": 11030, "firstName": "HAROLD", "lastName": "SAI", "age": 74, "maritalStatus": "S", "gender": "M", "income": 859500, "children": 2, "education": "M.Tech", "occupation": "Educator", "homeOwner": "Y"}]
+;
+
+const OCC_COLORS = {
+  'Professional':'#2F5EA8',
+  'Educator':'#0F8A6E',
+  'Accountant':'#D68A2B',
+  'Research':'#7B4FA0',
+  'Skilled Worker':'#B14A3A',
+  'Software Engineer':'#4C7A3D',
+  'AI Architect':'#C24B84'
+};
+const GENDER_LABEL = {M:'Male', F:'Female', Unknown:'Not specified'};
+const MARITAL_LABEL = {M:'Married', S:'Single'};
+const fmtMoney = v => '$' + Math.round(v).toLocaleString('en-US');
+const fmtMoneyShort = v => '$' + (v/1000).toFixed(0) + 'k';
+
+// ---------- populate filter options ----------
+function uniqueSorted(arr){ return [...new Set(arr)].sort(); }
+function fillSelect(id, values, labelFn){
+  const sel = document.getElementById(id);
+  values.forEach(v=>{
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = labelFn ? labelFn(v) : v;
+    sel.appendChild(opt);
+  });
+}
+fillSelect('f-occupation', uniqueSorted(DATA.map(d=>d.occupation)));
+fillSelect('f-education', uniqueSorted(DATA.map(d=>d.education)));
+fillSelect('f-gender', uniqueSorted(DATA.map(d=>d.gender)), g=>GENDER_LABEL[g]||g);
+fillSelect('f-marital', uniqueSorted(DATA.map(d=>d.maritalStatus)), m=>MARITAL_LABEL[m]||m);
+fillSelect('f-home', ['Y','N'], h=>h==='Y' ? 'Owns home' : 'Rents');
+
+// ---------- range sliders ----------
+const ages = DATA.map(d=>d.age);
+const incomes = DATA.map(d=>d.income);
+const ageMin = Math.min(...ages), ageMax = Math.max(...ages);
+const incMin = Math.min(...incomes), incMax = Math.max(...incomes);
+
+const rAgeMin = document.getElementById('r-age-min');
+const rAgeMax = document.getElementById('r-age-max');
+const rIncMin = document.getElementById('r-inc-min');
+const rIncMax = document.getElementById('r-inc-max');
+[rAgeMin, rAgeMax].forEach(r=>{ r.min=ageMin; r.max=ageMax; });
+[rIncMin, rIncMax].forEach(r=>{ r.min=incMin; r.max=incMax; r.step=1000; });
+rAgeMin.value = ageMin; rAgeMax.value = ageMax;
+rIncMin.value = incMin; rIncMax.value = incMax;
+
+function refreshRangeLabels(){
+  document.getElementById('ageMinLbl').textContent = rAgeMin.value;
+  document.getElementById('ageMaxLbl').textContent = rAgeMax.value;
+  document.getElementById('incMinLbl').textContent = fmtMoneyShort(+rIncMin.value);
+  document.getElementById('incMaxLbl').textContent = fmtMoneyShort(+rIncMax.value);
+}
+refreshRangeLabels();
+
+// ---------- state ----------
+let sortKey = 'id', sortDir = 1;
+
+function currentFilters(){
+  return {
+    occupation: document.getElementById('f-occupation').value,
+    education: document.getElementById('f-education').value,
+    gender: document.getElementById('f-gender').value,
+    marital: document.getElementById('f-marital').value,
+    home: document.getElementById('f-home').value,
+    ageMin: Math.min(+rAgeMin.value, +rAgeMax.value),
+    ageMax: Math.max(+rAgeMin.value, +rAgeMax.value),
+    incMin: Math.min(+rIncMin.value, +rIncMax.value),
+    incMax: Math.max(+rIncMin.value, +rIncMax.value),
+  };
+}
+
+function applyFilters(){
+  const f = currentFilters();
+  return DATA.filter(d=>
+    (!f.occupation || d.occupation===f.occupation) &&
+    (!f.education || d.education===f.education) &&
+    (!f.gender || d.gender===f.gender) &&
+    (!f.marital || d.maritalStatus===f.marital) &&
+    (!f.home || d.homeOwner===f.home) &&
+    d.age>=f.ageMin && d.age<=f.ageMax &&
+    d.income>=f.incMin && d.income<=f.incMax
+  );
+}
+
+// ---------- charts (instantiate once, update via .data) ----------
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.color = '#5B6B82';
+Chart.defaults.font.size = 11.5;
+
+const scatterChart = new Chart(document.getElementById('scatterChart'), {
+  type:'bubble',
+  data:{datasets:[]},
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:(ctx)=>{
+        const p = ctx.raw;
+        return `${p.name} · ${p.occupation} · Age ${p.x} · ${fmtMoney(p.y)}`;
+      }}}
+    },
+    scales:{
+      x:{title:{display:true,text:'Age'},grid:{color:'#EEF0F3'}},
+      y:{title:{display:true,text:'Annual income'},grid:{color:'#EEF0F3'},ticks:{callback:v=>fmtMoneyShort(v)}}
+    }
+  }
+});
+
+const occChart = new Chart(document.getElementById('occChart'), {
+  type:'doughnut',
+  data:{labels:[],datasets:[{data:[],backgroundColor:[],borderWidth:2,borderColor:'#fff'}]},
+  options:{
+    responsive:true, maintainAspectRatio:false, cutout:'62%',
+    plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed} customer(s)`}}}
+  }
+});
+
+const homeChart = new Chart(document.getElementById('homeChart'), {
+  type:'doughnut',
+  data:{labels:['Owns home','Rents'],datasets:[{data:[0,0],backgroundColor:['#0F8A6E','#E3E6EB'],borderWidth:2,borderColor:'#fff'}]},
+  options:{
+    responsive:true, maintainAspectRatio:false, cutout:'62%',
+    plugins:{legend:{position:'bottom',labels:{boxWidth:9,boxHeight:9,padding:14}}}
+  }
+});
+
+const incomeHist = new Chart(document.getElementById('incomeHist'), {
+  type:'bar',
+  data:{labels:[],datasets:[{data:[],backgroundColor:'#2F5EA8',borderRadius:4,maxBarThickness:44}]},
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{ x:{grid:{display:false}}, y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'#EEF0F3'}} }
+  }
+});
+
+const ageHist = new Chart(document.getElementById('ageHist'), {
+  type:'bar',
+  data:{labels:[],datasets:[{data:[],backgroundColor:'#7B4FA0',borderRadius:4,maxBarThickness:44}]},
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{ x:{grid:{display:false}}, y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'#EEF0F3'}} }
+  }
+});
+
+const eduChart = new Chart(document.getElementById('eduChart'), {
+  type:'bar',
+  data:{labels:[],datasets:[{data:[],backgroundColor:'#D68A2B',borderRadius:4,maxBarThickness:20}]},
+  options:{
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{ x:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'#EEF0F3'}}, y:{grid:{display:false}} }
+  }
+});
+
+const childChart = new Chart(document.getElementById('childChart'), {
+  type:'bar',
+  data:{labels:['0','1','2','3','4','5'],datasets:[{data:[],backgroundColor:'#4C7A3D',borderRadius:4,maxBarThickness:44}]},
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{ x:{title:{display:true,text:'Number of children'},grid:{display:false}}, y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'#EEF0F3'}} }
+  }
+});
+
+function histBins(values, binSize, min, max){
+  const bins = [];
+  for(let b=min; b<=max; b+=binSize){ bins.push({start:b, end:b+binSize, count:0}); }
+  values.forEach(v=>{
+    let idx = Math.floor((v-min)/binSize);
+    if(idx>=bins.length) idx = bins.length-1;
+    if(idx<0) idx = 0;
+    bins[idx].count++;
+  });
+  return bins;
+}
+
+function renderLegend(container, entries){
+  container.innerHTML = entries.map(e=>
+    `<span class="legend-item"><span class="swatch" style="background:${e.color}"></span>${e.label}</span>`
+  ).join('');
+}
+
+// ---------- render everything ----------
+function render(){
+  const rows = applyFilters();
+
+  // KPIs
+  document.getElementById('kpiCount').textContent = rows.length;
+  document.getElementById('kpiIncome').textContent = rows.length ? fmtMoney(rows.reduce((a,d)=>a+d.income,0)/rows.length) : '—';
+  document.getElementById('kpiHome').textContent = rows.length ? Math.round(100*rows.filter(d=>d.homeOwner==='Y').length/rows.length)+'%' : '—';
+  document.getElementById('kpiAge').textContent = rows.length ? Math.round(rows.reduce((a,d)=>a+d.age,0)/rows.length) : '—';
+
+  // scatter
+  const byOcc = {};
+  rows.forEach(d=>{ (byOcc[d.occupation] = byOcc[d.occupation]||[]).push(d); });
+  scatterChart.data.datasets = Object.keys(byOcc).map(occ=>({
+    label:occ,
+    backgroundColor: OCC_COLORS[occ] + 'CC',
+    data: byOcc[occ].map(d=>({x:d.age, y:d.income, r:6+d.children*2, name:`${d.firstName} ${d.lastName}`, occupation:occ}))
+  }));
+  scatterChart.update();
+
+  // occupation donut
+  const occCounts = {};
+  rows.forEach(d=>{ occCounts[d.occupation] = (occCounts[d.occupation]||0)+1; });
+  const occLabels = Object.keys(occCounts).sort((a,b)=>occCounts[b]-occCounts[a]);
+  occChart.data.labels = occLabels;
+  occChart.data.datasets[0].data = occLabels.map(l=>occCounts[l]);
+  occChart.data.datasets[0].backgroundColor = occLabels.map(l=>OCC_COLORS[l]);
+  occChart.update();
+  let occLegendEl = document.getElementById('occLegend');
+  if(!occLegendEl){
+    occLegendEl = document.createElement('div');
+    occLegendEl.className='legend-row'; occLegendEl.id='occLegend';
+    document.getElementById('occChart').closest('.card').appendChild(occLegendEl);
+  }
+  renderLegend(occLegendEl, occLabels.map(l=>({color:OCC_COLORS[l], label:`${l} (${occCounts[l]})`})));
+
+  // home ownership
+  const owners = rows.filter(d=>d.homeOwner==='Y').length;
+  homeChart.data.datasets[0].data = [owners, rows.length-owners];
+  homeChart.update();
+
+  // income histogram (bands of $200k)
+  const incBins = rows.length ? histBins(rows.map(d=>d.income), 200000, 400000, 1600000) : [];
+  incomeHist.data.labels = incBins.map(b=>`${fmtMoneyShort(b.start)}–${fmtMoneyShort(b.end)}`);
+  incomeHist.data.datasets[0].data = incBins.map(b=>b.count);
+  incomeHist.update();
+
+  // age histogram (bands of 10 yrs)
+  const ageBins = rows.length ? histBins(rows.map(d=>d.age), 10, 40, 90) : [];
+  ageHist.data.labels = ageBins.map(b=>`${b.start}–${b.end}`);
+  ageHist.data.datasets[0].data = ageBins.map(b=>b.count);
+  ageHist.update();
+
+  // education
+  const eduCounts = {};
+  rows.forEach(d=>{ eduCounts[d.education] = (eduCounts[d.education]||0)+1; });
+  const eduLabels = Object.keys(eduCounts).sort((a,b)=>eduCounts[a]-eduCounts[b]);
+  eduChart.data.labels = eduLabels;
+  eduChart.data.datasets[0].data = eduLabels.map(l=>eduCounts[l]);
+  eduChart.update();
+
+  // children
+  const childCounts = [0,0,0,0,0,0];
+  rows.forEach(d=>{ if(d.children>=0 && d.children<=5) childCounts[d.children]++; });
+  childChart.data.datasets[0].data = childCounts;
+  childChart.update();
+
+  // table
+  renderTable(rows);
+}
+
+function renderTable(rows){
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('emptyState');
+  document.getElementById('tableCount').textContent = `${rows.length} shown`;
+
+  if(rows.length===0){
+    tbody.innerHTML=''; empty.style.display='block'; return;
+  }
+  empty.style.display='none';
+
+  const sorted = [...rows].sort((a,b)=>{
+    let av, bv;
+    if(sortKey==='name'){ av=(a.firstName+a.lastName); bv=(b.firstName+b.lastName); }
+    else { av=a[sortKey]; bv=b[sortKey]; }
+    if(typeof av === 'string') return av.localeCompare(bv) * sortDir;
+    return (av-bv) * sortDir;
+  });
+
+  tbody.innerHTML = sorted.map(d=>`
+    <tr>
+      <td class="mono">${d.id}</td>
+      <td class="name-cell">${d.firstName} ${d.lastName}</td>
+      <td>${d.age}</td>
+      <td>${GENDER_LABEL[d.gender]||d.gender}</td>
+      <td>${MARITAL_LABEL[d.maritalStatus]||d.maritalStatus}</td>
+      <td><span class="tag" style="background:${OCC_COLORS[d.occupation]}1A;color:${OCC_COLORS[d.occupation]}"><span class="dot" style="background:${OCC_COLORS[d.occupation]}"></span>${d.occupation}</span></td>
+      <td>${d.education}</td>
+      <td class="mono">${fmtMoney(d.income)}</td>
+      <td>${d.children}</td>
+      <td class="${d.homeOwner==='Y' ? 'yn-y':'yn-n'}">${d.homeOwner==='Y' ? 'Owns':'Rents'}</td>
+    </tr>
+  `).join('');
+}
+
+// ---------- events ----------
+['f-occupation','f-education','f-gender','f-marital','f-home'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', render);
+});
+[rAgeMin, rAgeMax, rIncMin, rIncMax].forEach(r=>{
+  r.addEventListener('input', ()=>{ refreshRangeLabels(); render(); });
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  ['f-occupation','f-education','f-gender','f-marital','f-home'].forEach(id=>document.getElementById(id).value='');
+  rAgeMin.value=ageMin; rAgeMax.value=ageMax; rIncMin.value=incMin; rIncMax.value=incMax;
+  refreshRangeLabels(); render();
+});
+document.querySelectorAll('thead th').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.key;
+    if(sortKey===key){ sortDir*=-1; } else { sortKey=key; sortDir=1; }
+    document.querySelectorAll('thead .arrow').forEach(a=>a.textContent='');
+    th.querySelector('.arrow').textContent = sortDir===1 ? '▲' : '▼';
+    renderTable(applyFilters());
+  });
+});
+
+render();
+</script>
+</body>
+</html>
